@@ -1,4 +1,4 @@
-// Three.js Scene Setup Module
+// Three.js Scene Setup Module - OPTIMIZED VERSION
 
 let scene, camera, renderer, universeGroup, centralSystem;
 
@@ -20,11 +20,17 @@ function initScene() {
 
   // Create Renderer
   renderer = new THREE.WebGLRenderer({
-    antialias: true,
+    antialias: true, // Keep true for smooth edges, set to false if laggy on old devices
     alpha: true,
+    powerPreference: "high-performance",
   });
+
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(window.devicePixelRatio);
+
+  // OPTIMIZATION: Limit PixelRatio to 2.
+  // Rendering at 3x or 4x (Retina) kills performance for particle systems.
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
   container.appendChild(renderer.domElement);
 
   // Create Universe Group (for global transformations)
@@ -45,6 +51,8 @@ function onWindowResize() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  // Also update pixel ratio on resize just in case of screen switching
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 }
 
 function getScene() {

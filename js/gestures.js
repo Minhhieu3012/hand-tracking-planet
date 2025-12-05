@@ -1,4 +1,4 @@
-// MediaPipe Hand Tracking & Gesture Detection Module
+// MediaPipe Hand Tracking & Gesture Detection Module - OPTIMIZED VERSION
 
 let hands;
 let gestureState = {
@@ -89,8 +89,17 @@ function onHandResults(results) {
       gestureState.handAngle = gesture.angle;
 
       let dAngle = gestureState.handAngle - gestureState.prevHandAngle;
+
+      // Fix wrap-around issues (e.g. from PI to -PI)
       if (dAngle > Math.PI) dAngle -= Math.PI * 2;
       if (dAngle < -Math.PI) dAngle += Math.PI * 2;
+
+      // OPTIMIZATION: Deadzone filtering (Lọc nhiễu)
+      // Nếu góc xoay quá nhỏ, coi như không xoay để tránh màn hình rung lắc
+      if (Math.abs(dAngle) < 0.03) {
+        dAngle = 0;
+      }
+
       gestureState.deltaAngle = dAngle;
 
       debugText.innerText = "🖐 TWIST: Rolling Z-Axis";
