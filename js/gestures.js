@@ -1,15 +1,26 @@
-// MediaPipe Hand Tracking & Gesture Detection Module - IRON MAN EDITION
+// MediaPipe Hand Tracking - STABILIZED VERSION (CHỐNG RUNG)
 
 let hands;
 let gestureState = {
   isHandDetected: false,
-  isGripping: false, // Trạng thái "đang cầm" (Pinch hoặc Fist)
+  isGripping: false,
   handX: 0,
   handY: 0,
   deltaX: 0,
   deltaY: 0,
-  pinchDistance: 0, // Khoảng cách zoom (ngón cái - ngón giữa/út)
+  pinchDistance: 0,
 };
+
+// Biến lưu vị trí cũ để làm mượt (Smoothing)
+let smoothX = 0;
+let smoothY = 0;
+let smoothPinch = 0;
+
+// HỆ SỐ LÀM MƯỢT (0.0 -> 1.0)
+// 0.1: Rất mượt nhưng trễ (như kéo dây thun)
+// 0.9: Rất nhạy nhưng rung
+// 0.5: Cân bằng tốt nhất cho Iron Man UI
+const SMOOTHING_FACTOR = 0.4;
 
 function initGestures() {
   const videoElement = document.getElementById("webcam-feed");
@@ -57,42 +68,54 @@ function onHandResults(results) {
   gestureState.isHandDetected = true;
   const lm = results.multiHandLandmarks[0];
 
-  // Lấy tọa độ trung tâm (Lòng bàn tay - Landmark 9)
-  const currentX = 1 - lm[9].x; // Đảo ngược trục X (Mirror)
-  const currentY = lm[9].y;
+  // Lấy tọa độ thô (Raw Data)
+  const rawX = 1 - lm[9].x; // Mirror X
+  const rawY = lm[9].y;
 
-  // Tính độ dịch chuyển (Delta) cho quán tính
-  gestureState.deltaX = currentX - gestureState.handX;
-  gestureState.deltaY = currentY - gestureState.handY;
+  // --- THUẬT TOÁN CHỐNG RUNG (LERP) ---
+  // Thay vì lấy ngay rawX, ta lấy trung bình cộng với vị trí cũ
+  // Công thức: Mới = Cũ + (Đích - Cũ) * Hệ_số
 
-  // Cập nhật vị trí mới
-  gestureState.handX = currentX;
-  gestureState.handY = currentY;
+  if (smoothX === 0) {
+    smoothX = rawX;
+    smoothY = rawY;
+  } // Init frame đầu
 
-  // 3. PHÁT HIỆN CỬ CHỈ (Logic mới)
+  smoothX += (rawX - smoothX) * SMOOTHING_FACTOR;
+  smoothY += (rawY - smoothY) * SMOOTHING_FACTOR;
 
-  // Khoảng cách giữa ĐẦU NGÓN CÁI (4) và ĐẦU NGÓN TRỎ (8)
+  // Tính Delta dựa trên tọa độ ĐÃ LÀM MƯỢT
+  gestureState.deltaX = smoothX - gestureState.handX;
+  gestureState.deltaY = smoothY - gestureState.handY;
+
+  // Cập nhật vị trí hiện tại
+  gestureState.handX = smoothX;
+  gestureState.handY = smoothY;
+
+  // 3. XỬ LÝ PINCH/ZOOM
   const gripDistance = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y);
+  const zoomRaw = Math.hypot(lm[4].x - lm[12].x, lm[4].y - lm[12].y);
 
-  // Khoảng cách ZOOM: Giữa NGÓN CÁI (4) và NGÓN GIỮA (12)
-  // Dùng ngón giữa để zoom tách biệt với ngón trỏ (để xoay)
-  const zoomDistance = Math.hypot(lm[4].x - lm[12].x, lm[4].y - lm[12].y);
-  gestureState.pinchDistance = zoomDistance;
+  // Làm mượt cả thông số Zoom luôn
+  smoothPinch += (zoomRaw - smoothPinch) * SMOOTHING_FACTOR;
+  gestureState.pinchDistance = smoothPinch;
 
-  // NGƯỠNG KÍCH HOẠT (Threshold)
-  // Nếu ngón cái và trỏ gần nhau (< 0.05) -> Đang cầm (GRIPPING)
+  // --- VÙNG CHẾT (DEADZONE) ---
+  // Nếu tay di chuyển quá ít (chỉ rung nhẹ), coi như đứng yên (delta = 0)
+  if (Math.abs(gestureState.deltaX) < 0.001) gestureState.deltaX = 0;
+  if (Math.abs(gestureState.deltaY) < 0.001) gestureState.deltaY = 0;
+
+  // Phát hiện trạng thái Lock
   if (gripDistance < 0.05) {
     gestureState.isGripping = true;
     debugText.innerText = "🔒 LOCKED (Rotating)";
-    debugText.style.color = "#00ffff"; // Cyan color
+    debugText.style.color = "#00ffff";
+    debugText.style.textShadow = "0 0 10px #00ffff";
   } else {
     gestureState.isGripping = false;
-
-    // Nếu không cầm, kiểm tra xem có đang Zoom không
-    // (Ngón cái xa ngón trỏ, nhưng gần ngón giữa?) - Logic đơn giản hóa:
-    // Chỉ hiện thông báo trạng thái thả trôi
     debugText.innerText = "🖐 RELEASED (Inertia)";
     debugText.style.color = "#ffffff";
+    debugText.style.textShadow = "none";
   }
 }
 

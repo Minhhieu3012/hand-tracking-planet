@@ -3,58 +3,68 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hand Tracking Planet</title>
+    <title>Stark HUD Interface</title>
 
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- Three.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
-    <!-- MediaPipe -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
 
-    <!-- Custom CSS -->
     <link rel="stylesheet" href="css/styles.css" />
   </head>
   <body>
     <div id="canvas-container"></div>
 
-    <button id="toggle-ui-btn" class="font-bold font-mono">ℹ️ INFO</button>
+    <button id="toggle-ui-btn" class="font-bold font-mono">ℹ️ SYSTEM</button>
 
     <div id="ui-layer">
-      <div class="instruction-card shadow-lg shadow-cyan-500/10">
-        <h1 class="text-xl font-bold text-cyan-400 mb-2 tracking-wider">
-          STAR CORE 💠
-        </h1>
-        <div id="loading-msg" class="text-sm text-gray-400 mb-2">
+      <div class="instruction-card jarvis-panel">
+        <div class="panel-header">
+          <h1 class="text-xl font-bold text-cyan-400 tracking-widest">
+            STARK HUD <span class="text-xs align-top opacity-50">v.1.0</span>
+          </h1>
+          <div class="scan-line"></div>
+        </div>
+
+        <div id="loading-msg" class="text-xs text-cyan-200 mb-4 font-mono">
           <span class="status-dot status-loading" id="status-dot"></span>
-          <span id="status-text">Initializing AI...</span>
+          <span id="status-text">INITIALIZING SENSORS...</span>
         </div>
 
         <div
-          class="space-y-2 text-sm text-cyan-100 mt-4 border-t border-cyan-900 pt-3"
+          class="space-y-3 text-sm text-cyan-100 mt-2 pt-2 border-t border-cyan-800 font-mono"
         >
-          <div class="flex items-center">
-            <span class="gesture-icon">✊</span>
-            <span><strong>Fist:</strong> Rotate XY Axis</span>
+          <div class="gesture-row flex items-center">
+            <span class="gesture-icon">👌</span>
+            <div class="flex flex-col">
+              <span class="font-bold text-cyan-300">LOCK</span>
+              <span class="text-xs opacity-70">Rotate and Lock</span>
+            </div>
           </div>
-          <div class="flex items-center">
-            <span class="gesture-icon">✌️</span>
-            <span><strong>2 Fingers:</strong> Zoom (Fold others)</span>
-          </div>
-          <div class="flex items-center">
+
+          <div class="gesture-row flex items-center">
             <span class="gesture-icon">🖐</span>
-            <span><strong>Open Hand:</strong> Twist (Roll)</span>
+            <div class="flex flex-col">
+              <span class="font-bold text-cyan-300">OPEN</span>
+              <span class="text-xs opacity-70">Zoom</span>
+            </div>
           </div>
         </div>
 
-        <div class="mt-4">
-          <p class="text-xs text-cyan-600 font-mono">DEBUG:</p>
-          <p id="debug-text" class="text-xs text-gray-500 font-mono">
-            Scanning...
+        <div class="mt-5 border-t border-cyan-800 pt-2">
+          <p
+            class="text-[10px] text-cyan-600 font-mono uppercase tracking-wider"
+          >
+            SYSTEM STATUS:
+          </p>
+          <p
+            id="debug-text"
+            class="text-xs text-cyan-400 font-mono animate-pulse"
+          >
+            Waiting for input...
           </p>
         </div>
       </div>
@@ -62,7 +72,6 @@
 
     <video id="webcam-feed" autoplay playsinline muted></video>
 
-    <!-- JavaScript Modules -->
     <script src="js/config.js"></script>
     <script src="js/textures.js"></script>
     <script src="js/scene.js"></script>
