@@ -1,8 +1,11 @@
-// Gesture-to-Control Mapping Module (Quaternion-based Rotation)
+// Gesture-to-Control Mapping Module (Smart Switching: Zoom vs Rotate)
 
-let controlState = {
-  targetQuaternion: new THREE.Quaternion(),
+let physicsState = {
+  velocityX: 0,
+  velocityY: 0,
   targetZoom: CONFIG.CAMERA_INITIAL_Z,
+  isDragging: false, // Biến này = true khi bạn đang chụm tay (xoay)
+  lastGestureTime: 0,
 };
 
 function updateControls() {
@@ -10,94 +13,88 @@ function updateControls() {
   const camera = getCamera();
   const universeGroup = getUniverseGroup();
 
-  // Apply Camera Zoom (smooth)
-  camera.position.z +=
-    (controlState.targetZoom - camera.position.z) * CONFIG.CAMERA_SMOOTH;
-
-  // Apply Rotation based on gesture
+  // --- 1. XỬ LÝ ĐẦU VÀO (INPUT) ---
   if (gesture.isHandDetected) {
-    switch (gesture.gestureType) {
-      case "fist":
-        applyFistRotation(gesture);
-        break;
-      case "twoFingers":
-        applyZoom(gesture);
-        break;
-      case "openHand":
-        applyRoll(gesture);
-        break;
+    // Lấy khoảng cách giữa ngón cái và ngón trỏ (đã tính bên gestures.js hoặc tính trực tiếp ở đây)
+    // Giả sử gesture.pinchDistance là khoảng cách chuẩn
+    const pinchDist = gesture.pinchDistance || 0;
+
+    // NGƯỠNG QUYẾT ĐỊNH (Threshold):
+    // < 0.05: Đang kẹp tay (Chế độ XOAY)
+    // > 0.06: Đang mở tay (Chế độ ZOOM)
+    const GRAB_THRESHOLD = 0.06;
+
+    if (pinchDist < GRAB_THRESHOLD) {
+      // === CHẾ ĐỘ XOAY (GRAB MODE) ===
+      physicsState.isDragging = true;
+
+      // Map chuyển động tay sang vận tốc xoay
+      // deltaX/Y là độ dịch chuyển của tay so với frame trước
+      physicsState.velocityX = gesture.deltaY * CONFIG.ROTATION_SENSITIVITY;
+      physicsState.velocityY = gesture.deltaX * CONFIG.ROTATION_SENSITIVITY;
+    } else {
+      // === CHẾ ĐỘ ZOOM (HOVER MODE) ===
+      physicsState.isDragging = false;
+
+      // Logic Zoom:
+      // Map khoảng cách ngón tay (0.06 -> 0.3) sang khoảng cách Camera (Xa -> Gần)
+      // Pinch càng lớn (tay mở rộng) -> Zoom vào gần
+      const minP = GRAB_THRESHOLD;
+      const maxP = 0.25; // Khoảng cách mở tay tối đa thường gặp
+
+      // Chuẩn hóa về 0 -> 1
+      let t = (pinchDist - minP) / (maxP - minP);
+      t = Math.max(0, Math.min(1, t)); // Kẹp giá trị lại
+
+      // Tính Target Zoom (Đảo ngược: t lớn -> zoom gần/giá trị nhỏ)
+      const targetZ = CONFIG.ZOOM_MAX - t * (CONFIG.ZOOM_MAX - CONFIG.ZOOM_MIN);
+
+      // Chỉ cập nhật zoom nếu thay đổi đáng kể (tránh rung)
+      if (Math.abs(targetZ - physicsState.targetZoom) > 0.1) {
+        physicsState.targetZoom = targetZ;
+      }
     }
-
-    // Smooth rotation using Quaternion slerp
-    universeGroup.quaternion.slerp(
-      controlState.targetQuaternion,
-      CONFIG.ROTATION_SMOOTH
-    );
   } else {
-    // Idle drift when no hand detected
-    applyIdleDrift();
-    universeGroup.quaternion.slerp(
-      controlState.targetQuaternion,
-      CONFIG.ROTATION_SMOOTH
-    );
+    // Không thấy tay -> Thả trôi
+    physicsState.isDragging = false;
   }
-}
 
-// FIST: Rotate XY in World Space
-function applyFistRotation(gesture) {
-  const dX = gesture.deltaX;
-  const dY = gesture.deltaY;
+  // --- 2. XỬ LÝ VẬT LÝ (QUÁN TÍNH) ---
 
-  // Create World-Space rotations
-  // Drag Right (dX > 0) -> Rotate around World Y axis (0,1,0)
+  // Khi không xoay, áp dụng ma sát để vật thể trôi từ từ rồi dừng
+  if (!physicsState.isDragging) {
+    physicsState.velocityX *= CONFIG.INERTIA_DAMPING;
+    physicsState.velocityY *= CONFIG.INERTIA_DAMPING;
+
+    // Nếu trôi gần hết đà, chuyển sang chế độ tự quay nhẹ (Screensaver mode)
+    if (
+      Math.abs(physicsState.velocityX) < 0.0001 &&
+      Math.abs(physicsState.velocityY) < 0.0001
+    ) {
+      physicsState.velocityY = CONFIG.IDLE_ROTATION_SPEED;
+    }
+  }
+
+  // --- 3. RENDER (ÁP DỤNG VÀO SCENE) ---
+
+  // Xoay trục Y (Trái/Phải)
   const qY = new THREE.Quaternion().setFromAxisAngle(
     new THREE.Vector3(0, 1, 0),
-    dX * CONFIG.ROTATION_SENSITIVITY
+    physicsState.velocityY
   );
 
-  // Drag Up (dY > 0) -> Rotate around World X axis (1,0,0)
+  // Xoay trục X (Lên/Xuống)
   const qX = new THREE.Quaternion().setFromAxisAngle(
     new THREE.Vector3(1, 0, 0),
-    dY * CONFIG.ROTATION_SENSITIVITY
+    physicsState.velocityX
   );
 
-  // Premultiply = World Space rotation
-  controlState.targetQuaternion.premultiply(qY);
-  controlState.targetQuaternion.premultiply(qX);
-}
+  // Cộng dồn góc xoay vào vật thể
+  universeGroup.quaternion.premultiply(qY);
+  universeGroup.quaternion.premultiply(qX);
 
-// TWO FINGERS: Zoom
-function applyZoom(gesture) {
-  const pinchDist = gesture.pinchDistance;
-  const minD = CONFIG.ZOOM_MIN_DISTANCE;
-  const maxD = CONFIG.ZOOM_MAX_DISTANCE;
-
-  // Map pinch distance to zoom level
-  const t = (Math.max(minD, Math.min(maxD, pinchDist)) - minD) / (maxD - minD);
-  controlState.targetZoom =
-    CONFIG.ZOOM_MAX - t * (CONFIG.ZOOM_MAX - CONFIG.ZOOM_MIN);
-}
-
-// OPEN HAND: Roll Z-axis
-function applyRoll(gesture) {
-  const dAngle = gesture.deltaAngle;
-
-  // Only apply if movement is significant
-  if (Math.abs(dAngle) > CONFIG.ROLL_THRESHOLD) {
-    // Twist Right -> Rotate around World Z axis (0,0,1)
-    const qZ = new THREE.Quaternion().setFromAxisAngle(
-      new THREE.Vector3(0, 0, 1),
-      dAngle * CONFIG.ROLL_SENSITIVITY
-    );
-    controlState.targetQuaternion.premultiply(qZ);
-  }
-}
-
-// Idle Drift (slow automatic rotation)
-function applyIdleDrift() {
-  const driftQ = new THREE.Quaternion().setFromAxisAngle(
-    new THREE.Vector3(0, 1, 0),
-    CONFIG.IDLE_DRIFT_SPEED
-  );
-  controlState.targetQuaternion.premultiply(driftQ);
+  // Smooth Zoom (Lerp)
+  // Di chuyển camera từ từ đến vị trí target
+  camera.position.z +=
+    (physicsState.targetZoom - camera.position.z) * CONFIG.ZOOM_SMOOTH;
 }
