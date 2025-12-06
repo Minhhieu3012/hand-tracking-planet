@@ -1,23 +1,24 @@
-// Configuration & Constants - J.A.R.V.I.S THEME
+// Configuration - OPTIMIZED FOR SMOOTHNESS
 
 const CONFIG = {
-  // --- PARTICLE COUNTS (Tăng nhẹ số lượng hạt để hình ảnh mịn hơn) ---
-  SURFACE_PARTICLE_COUNT: 10000,
-  MAIN_RING_PARTICLES: 14000,
-  RING2_PARTICLES: 7000,
-  RING3_PARTICLES: 7000,
-  STAR_COUNT: 4000,
-  TINY_STAR_COUNT: 2000,
-  NEBULA_COUNT: 600,
+  // --- PARTICLE COUNTS (GIẢM NHẸ ĐỂ TĂNG FPS) ---
+  // Giảm bớt số lượng hạt giúp máy render nhanh hơn -> Chuyển động mượt hơn
+  SURFACE_PARTICLE_COUNT: 6000,
+  MAIN_RING_PARTICLES: 8000,
+  RING2_PARTICLES: 4000,
+  RING3_PARTICLES: 4000,
+  STAR_COUNT: 3000,
+  TINY_STAR_COUNT: 1500,
+  NEBULA_COUNT: 400,
 
   // --- DIMENSIONS ---
   PLANET_RADIUS: 1.9,
   PLANET_DEPTH: 0.4,
-  SURFACE_PARTICLE_SIZE: 0.07, // Hạt nhỏ hơn một chút cho sắc nét
+  SURFACE_PARTICLE_SIZE: 0.08,
 
   CORE_SCALE: 3.5,
-  CORE_PULSE_SPEED: 2.5,
-  CORE_PULSE_AMOUNT: 0.15,
+  CORE_PULSE_SPEED: 2.0,
+  CORE_PULSE_AMOUNT: 0.1,
 
   MAIN_RING_INNER: 3.2,
   MAIN_RING_OUTER: 6.0,
@@ -26,14 +27,12 @@ const CONFIG = {
   RING3_INNER: 7.2,
   RING3_OUTER: 7.8,
 
-  // --- JARVIS COLOR PALETTE (QUAN TRỌNG) ---
-  // Màu chủ đạo là Cyan (Xanh lơ) và Blue (Xanh dương đậm)
-  PLANET_COLOR1: 0x00ffff, // Cyan sáng (Arc Reactor)
-  PLANET_COLOR2: 0x0055ff, // Deep Blue (Hologram shadow)
-  CORE_COLOR: 0xffffff, // Trắng tinh khiết ở tâm
-
-  MAIN_RING_COLOR1: 0x00aaff, // Light Blue
-  MAIN_RING_COLOR2: 0x002244, // Dark Navy transparency
+  // --- COLORS (CYAN THEME) ---
+  PLANET_COLOR1: 0x00ffff,
+  PLANET_COLOR2: 0x0055ff,
+  CORE_COLOR: 0xffffff,
+  MAIN_RING_COLOR1: 0x00aaff,
+  MAIN_RING_COLOR2: 0x002244,
 
   // --- CAMERA ---
   CAMERA_FOV: 75,
@@ -41,27 +40,31 @@ const CONFIG = {
   CAMERA_FAR: 1000,
   CAMERA_INITIAL_Z: 9,
 
-  // --- PHYSICS & CONTROLS ---
-  ROTATION_SENSITIVITY: 6.0, // Tăng độ nhạy xoay
-  INERTIA_DAMPING: 0.94, // Độ trôi mượt mà
+  // --- PHYSICS (QUAN TRỌNG: ĐỘ MƯỢT) ---
+  // Giảm độ nhạy để tránh bị giật khi tay rung nhẹ
+  ROTATION_SENSITIVITY: 4.5,
+
+  // Tăng quán tính (càng gần 1 càng trôi lâu) -> Tạo cảm giác "đầm"
+  INERTIA_DAMPING: 0.96,
+
   MIN_VELOCITY: 0.0001,
-  IDLE_ROTATION_SPEED: 0.0008,
+  IDLE_ROTATION_SPEED: 0.0005,
 
   ZOOM_MIN: 3.0,
   ZOOM_MAX: 16.0,
-  ZOOM_SMOOTH: 0.1,
+  ZOOM_SMOOTH: 0.05, // Zoom từ từ, không giật
 
   // --- ANIMATION ---
-  PLANET_ROTATION_SPEED: 0.002,
-  MAIN_RING_SPEED: 0.003,
-  RING2_SPEED: 0.004,
-  RING3_SPEED: 0.002,
+  PLANET_ROTATION_SPEED: 0.001,
+  MAIN_RING_SPEED: 0.002,
+  RING2_SPEED: 0.003,
+  RING3_SPEED: 0.0015,
 
   // --- MEDIAPIPE ---
   MAX_HANDS: 1,
   MODEL_COMPLEXITY: 1,
-  MIN_DETECTION_CONFIDENCE: 0.6,
-  MIN_TRACKING_CONFIDENCE: 0.6,
+  MIN_DETECTION_CONFIDENCE: 0.5,
+  MIN_TRACKING_CONFIDENCE: 0.5,
   WEBCAM_WIDTH: 320,
   WEBCAM_HEIGHT: 240,
 };

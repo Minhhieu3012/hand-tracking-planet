@@ -1,4 +1,4 @@
-// MediaPipe Hand Tracking - STABILIZED VERSION (CHỐNG RUNG)
+// MediaPipe Hand Tracking - ULTRA SMOOTH VERSION
 
 let hands;
 let gestureState = {
@@ -11,16 +11,12 @@ let gestureState = {
   pinchDistance: 0,
 };
 
-// Biến lưu vị trí cũ để làm mượt (Smoothing)
-let smoothX = 0;
-let smoothY = 0;
-let smoothPinch = 0;
-
-// HỆ SỐ LÀM MƯỢT (0.0 -> 1.0)
-// 0.1: Rất mượt nhưng trễ (như kéo dây thun)
-// 0.9: Rất nhạy nhưng rung
-// 0.5: Cân bằng tốt nhất cho Iron Man UI
-const SMOOTHING_FACTOR = 0.4;
+// --- BỘ ĐỆM LỊCH SỬ (HISTORY BUFFER) ---
+// Lưu 5 vị trí gần nhất để chia trung bình
+const HISTORY_SIZE = 5;
+let historyX = [];
+let historyY = [];
+let historyPinch = [];
 
 function initGestures() {
   const videoElement = document.getElementById("webcam-feed");
@@ -35,8 +31,8 @@ function initGestures() {
   hands.setOptions({
     maxNumHands: CONFIG.MAX_HANDS,
     modelComplexity: 1,
-    minDetectionConfidence: 0.6,
-    minTrackingConfidence: 0.6,
+    minDetectionConfidence: 0.5,
+    minTrackingConfidence: 0.5,
   });
 
   hands.onResults(onHandResults);
@@ -53,59 +49,76 @@ function initGestures() {
   });
 }
 
+// Hàm tính trung bình cộng của mảng
+function getAverage(arr) {
+  if (arr.length === 0) return 0;
+  const sum = arr.reduce((a, b) => a + b, 0);
+  return sum / arr.length;
+}
+
 function onHandResults(results) {
   const debugText = document.getElementById("debug-text");
 
-  // 1. Không thấy tay
+  // 1. Không thấy tay -> Reset lịch sử để tránh trôi khi tay quay lại
   if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
     gestureState.isHandDetected = false;
     gestureState.isGripping = false;
+
+    // Reset bộ đệm khi mất tay
+    historyX = [];
+    historyY = [];
+
     debugText.innerText = "Waiting for input...";
     return;
   }
 
-  // 2. Có tay -> Xử lý tọa độ
+  // 2. Có tay
   gestureState.isHandDetected = true;
   const lm = results.multiHandLandmarks[0];
 
-  // Lấy tọa độ thô (Raw Data)
-  const rawX = 1 - lm[9].x; // Mirror X
+  // Lấy tọa độ thô
+  const rawX = 1 - lm[9].x;
   const rawY = lm[9].y;
 
-  // --- THUẬT TOÁN CHỐNG RUNG (LERP) ---
-  // Thay vì lấy ngay rawX, ta lấy trung bình cộng với vị trí cũ
-  // Công thức: Mới = Cũ + (Đích - Cũ) * Hệ_số
+  // --- THUẬT TOÁN LÀM MƯỢT (AVERAGING) ---
 
-  if (smoothX === 0) {
-    smoothX = rawX;
-    smoothY = rawY;
-  } // Init frame đầu
+  // Thêm giá trị mới vào mảng
+  historyX.push(rawX);
+  historyY.push(rawY);
 
-  smoothX += (rawX - smoothX) * SMOOTHING_FACTOR;
-  smoothY += (rawY - smoothY) * SMOOTHING_FACTOR;
+  // Nếu mảng quá dài, bỏ bớt giá trị cũ
+  if (historyX.length > HISTORY_SIZE) historyX.shift();
+  if (historyY.length > HISTORY_SIZE) historyY.shift();
 
-  // Tính Delta dựa trên tọa độ ĐÃ LÀM MƯỢT
-  gestureState.deltaX = smoothX - gestureState.handX;
-  gestureState.deltaY = smoothY - gestureState.handY;
+  // Tính vị trí trung bình
+  const avgX = getAverage(historyX);
+  const avgY = getAverage(historyY);
+
+  // Tính Delta dựa trên vị trí trung bình (Cực mượt)
+  // Chỉ tính delta nếu đã có vị trí cũ (tránh giật frame đầu)
+  if (gestureState.handX !== 0) {
+    gestureState.deltaX = avgX - gestureState.handX;
+    gestureState.deltaY = avgY - gestureState.handY;
+  }
 
   // Cập nhật vị trí hiện tại
-  gestureState.handX = smoothX;
-  gestureState.handY = smoothY;
+  gestureState.handX = avgX;
+  gestureState.handY = avgY;
 
-  // 3. XỬ LÝ PINCH/ZOOM
+  // --- XỬ LÝ PINCH ZOOM (Cũng làm mượt tương tự) ---
   const gripDistance = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y);
   const zoomRaw = Math.hypot(lm[4].x - lm[12].x, lm[4].y - lm[12].y);
 
-  // Làm mượt cả thông số Zoom luôn
-  smoothPinch += (zoomRaw - smoothPinch) * SMOOTHING_FACTOR;
-  gestureState.pinchDistance = smoothPinch;
+  historyPinch.push(zoomRaw);
+  if (historyPinch.length > HISTORY_SIZE) historyPinch.shift();
 
-  // --- VÙNG CHẾT (DEADZONE) ---
-  // Nếu tay di chuyển quá ít (chỉ rung nhẹ), coi như đứng yên (delta = 0)
-  if (Math.abs(gestureState.deltaX) < 0.001) gestureState.deltaX = 0;
-  if (Math.abs(gestureState.deltaY) < 0.001) gestureState.deltaY = 0;
+  gestureState.pinchDistance = getAverage(historyPinch);
 
-  // Phát hiện trạng thái Lock
+  // Deadzone cực nhỏ để loại bỏ rung
+  if (Math.abs(gestureState.deltaX) < 0.0005) gestureState.deltaX = 0;
+  if (Math.abs(gestureState.deltaY) < 0.0005) gestureState.deltaY = 0;
+
+  // Trạng thái Lock
   if (gripDistance < 0.05) {
     gestureState.isGripping = true;
     debugText.innerText = "🔒 LOCKED (Rotating)";
