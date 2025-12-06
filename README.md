@@ -61,7 +61,7 @@ To run this project locally, you need a local server (due to browser security po
 1.  **Clone the repository**
 
     ```bash
-    git clone: https://github.com/Minhhieu3012/hand-tracking-planet.git
+    git clone: https://github.com/Minhhieu3012/stark-hud-interface.git
     ```
 
 2.  **Run with Live Server**
